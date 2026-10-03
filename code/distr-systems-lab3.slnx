@@ -1,0 +1,20 @@
+<Solution>
+  <Project Path="Cars.Api/Cars.Api.csproj" Id="a75f7243-cd4c-4629-965f-995d3bb3b459" />
+  <Project Path="Cars.Application/Cars.Application.csproj" Id="7a9a30d8-9055-4758-834e-30c121c3dd48" />
+  <Project Path="Cars.Domain/Cars.Domain.csproj" Id="c8301a4e-4470-4fbf-be17-fa0684a94c1b" />
+  <Project Path="Cars.Storage/Cars.Storage.csproj" Id="44313c89-55c9-4308-9bb8-89c2fa3bec1b" />
+  <Project Path="Gateway.Api/Gateway.Api.csproj" Id="36a3c575-3677-4053-9910-0b1ddc1f5721" />
+  <Project Path="Gateway.Application/Gateway.Application.csproj" Id="bc89e8cd-b179-4281-ba24-a837d26581c5" />
+  <Project Path="Gateway.Infrastructure/Gateway.Infrastructure.csproj" Id="5989591d-5806-4d82-b463-e634529293e8" />
+  <Project Path="Payments.Api/Payments.Api.csproj" />
+  <Project Path="Payments.Application/Payments.Application.csproj" />
+  <Project Path="Payments.Domain/Payments.Domain.csproj" />
+  <Project Path="Payments.Storage/Payments.Storage.csproj" />
+  <Project Path="Rentals.Api/Rentals.Api.csproj" Id="e88e3c09-18d4-4f03-a641-1d4758f994ec" />
+  <Project Path="Rentals.Application/Rentals.Application.csproj" Id="57e63fe5-d039-48ad-9b3b-0423a446b307" />
+  <Project Path="Rentals.Domain/Rentals.Domain.csproj" Id="590bdc65-8ac8-4528-9721-df12ae0fd4e7" />
+  <Project Path="Rentals.Storage/Rentals.Storage.csproj" Id="885c62a1-852c-44a5-ad5c-a1ae8d9baba9" />
+  <Project Path="UnitTestsCars/UnitTestsCars.csproj" />
+  <Project Path="UnitTestsPayments/UnitTestsPayments.csproj" />
+  <Project Path="UnitTestsRentals/UnitTestsRentals.csproj" />
+</Solution>
