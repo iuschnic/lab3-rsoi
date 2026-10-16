@@ -22,7 +22,6 @@ builder.Host.UseSerilog();
 builder.Services.AddSingleton(Log.Logger);
 
 builder.Services.AddServiceClients(builder.Configuration);
-builder.Services.AddScoped<ICarRentalService, CarRentalService>();
 
 var app = builder.Build();
 
