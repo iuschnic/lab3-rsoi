@@ -6,11 +6,11 @@ using Gateway.Infrastructure.Mappers;
 
 namespace Gateway.Infrastructure.Cars;
 
-public class CarsHttpClient : HttpClientBase, ICarsService
+public class CarsReadHttpClient : HttpClientBase, ICarsReadService
 {
     private const string BasePath = "api/v1/cars";
 
-    public CarsHttpClient(HttpClient httpClient) : base(httpClient) { }
+    public CarsReadHttpClient(HttpClient httpClient) : base(httpClient) { }
 
     protected override string ServiceName => "Cars";
 
@@ -47,19 +47,5 @@ public class CarsHttpClient : HttpClientBase, ICarsService
 
         var response = await SendOrDefaultOnNotFoundAsync<CarResponse>(request, cancellationToken);
         return response?.ToDto();
-    }
-
-    public Task ReserveCarAsync(Guid carUid, CancellationToken cancellationToken = default)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{BasePath}/{carUid}/reserve");
-
-        return SendAsync(request, cancellationToken);
-    }
-
-    public Task ReleaseCarAsync(Guid carUid, CancellationToken cancellationToken = default)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{BasePath}/{carUid}/release");
-
-        return SendAsync(request, cancellationToken);
     }
 }

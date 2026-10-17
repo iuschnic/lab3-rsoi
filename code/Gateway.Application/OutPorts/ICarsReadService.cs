@@ -2,7 +2,7 @@ using Gateway.Application.Dtos;
 
 namespace Gateway.Application.OutPorts;
 
-public interface ICarsService
+public interface ICarsReadService
 {
     Task<PagedResultDto<CarDto>> GetCarsAsync(
         int page,
@@ -15,8 +15,4 @@ public interface ICarsService
         CancellationToken cancellationToken = default);
 
     Task<CarDto?> GetCarAsync(Guid carUid, CancellationToken cancellationToken = default);
-
-    Task ReserveCarAsync(Guid carUid, CancellationToken cancellationToken = default);
-
-    Task ReleaseCarAsync(Guid carUid, CancellationToken cancellationToken = default);
 }

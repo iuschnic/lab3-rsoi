@@ -1,18 +1,9 @@
-using Gateway.Application.Dtos;
+﻿using Gateway.Application.Dtos;
 
 namespace Gateway.Application.OutPorts;
 
-public interface IRentalsService
+public interface IRentalsWriteService
 {
-    Task<IReadOnlyList<RentalDto>> GetRentalsAsync(
-        string username,
-        CancellationToken cancellationToken = default);
-
-    Task<RentalDto?> GetRentalAsync(
-        Guid rentalUid,
-        string username,
-        CancellationToken cancellationToken = default);
-
     Task<RentalDto> CreateRentalAsync(
         CreateRentalCommand command,
         CancellationToken cancellationToken = default);

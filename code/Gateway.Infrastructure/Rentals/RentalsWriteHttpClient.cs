@@ -1,4 +1,4 @@
-using Gateway.Application.Dtos;
+﻿using Gateway.Application.Dtos;
 using Gateway.Application.OutPorts;
 using Gateway.Infrastructure.Common;
 using Gateway.Infrastructure.Mappers;
@@ -6,35 +6,14 @@ using Gateway.Infrastructure.Rentals.Contracts;
 
 namespace Gateway.Infrastructure.Rentals;
 
-public class RentalsHttpClient : HttpClientBase, IRentalsService
+public class RentalsWriteHttpClient : HttpClientBase, IRentalsWriteService
 {
     private const string BasePath = "api/v1/rentals";
     private const string UserNameHeader = "X-User-Name";
 
-    public RentalsHttpClient(HttpClient httpClient) : base(httpClient) { }
+    public RentalsWriteHttpClient(HttpClient httpClient) : base(httpClient) { }
 
     protected override string ServiceName => "Rentals";
-
-    public async Task<IReadOnlyList<RentalDto>> GetRentalsAsync(
-        string username,
-        CancellationToken cancellationToken = default)
-    {
-        var request = CreateRequest(HttpMethod.Get, BasePath, username);
-
-        var response = await SendAsync<List<RentalResponse>>(request, cancellationToken);
-        return response.ToDto();
-    }
-
-    public async Task<RentalDto?> GetRentalAsync(
-        Guid rentalUid,
-        string username,
-        CancellationToken cancellationToken = default)
-    {
-        var request = CreateRequest(HttpMethod.Get, $"{BasePath}/{rentalUid}", username);
-
-        var response = await SendOrDefaultOnNotFoundAsync<RentalResponse>(request, cancellationToken);
-        return response?.ToDto();
-    }
 
     public async Task<RentalDto> CreateRentalAsync(
         CreateRentalCommand command,

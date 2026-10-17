@@ -8,16 +8,23 @@ namespace Gateway.Application.Services;
 
 public class CarRentalService : ICarRentalService
 {
-    private readonly ICarsService _carsService;
-    private readonly IRentalsService _rentalsService;
-    private readonly IPaymentsService _paymentService;
+    private readonly ICarsReadService _carsReadService;
+    private readonly ICarsWriteService _carsWriteService;
+    private readonly IRentalsReadService _rentalsReadService;
+    private readonly IRentalsWriteService _rentalsWriteService;
+    private readonly IPaymentsReadService _paymentsReadService;
+    private readonly IPaymentsWriteService _paymentsWriteService;
 
-    public CarRentalService(ICarsService carsService, IRentalsService rentalService,
-        IPaymentsService paymentsService)
+    public CarRentalService(ICarsReadService carsReadService, ICarsWriteService carsWriteService, 
+        IRentalsReadService rentalsReadService, IRentalsWriteService rentalsWriteService,
+        IPaymentsReadService paymentsReadService, IPaymentsWriteService paymentsWriteService)
     {
-        _carsService = carsService;
-        _rentalsService = rentalService;
-        _paymentService = paymentsService;
+        _carsReadService = carsReadService;
+        _carsWriteService = carsWriteService;
+        _rentalsReadService = rentalsReadService;
+        _rentalsWriteService = rentalsWriteService;
+        _paymentsReadService = paymentsReadService;
+        _paymentsWriteService = paymentsWriteService;
     }
 
     public async Task<PagedResultDto<CarDto>> GetCarsAsync(
@@ -26,20 +33,20 @@ public class CarRentalService : ICarRentalService
         bool showAll,
         CancellationToken cancellationToken = default)
     {
-        return await _carsService.GetCarsAsync(page, size, showAll, cancellationToken);
+        return await _carsReadService.GetCarsAsync(page, size, showAll, cancellationToken);
     }
 
     public async Task<IReadOnlyList<RentalAggregate>> GetUserRentalsAsync(
         string username,
         CancellationToken cancellationToken = default)
     {
-        var rentals = await _rentalsService.GetRentalsAsync(username, cancellationToken);
+        var rentals = await _rentalsReadService.GetRentalsAsync(username, cancellationToken);
         if (rentals.Count == 0)
             return Array.Empty<RentalAggregate>();
 
-        var cars = await _carsService.GetCarsAsync(
+        var cars = await _carsReadService.GetCarsAsync(
             rentals.Select(r => r.CarUid).Distinct().ToList(), cancellationToken);
-        var payments = await _paymentService.GetPaymentsAsync(
+        var payments = await _paymentsReadService.GetPaymentsAsync(
             rentals.Select(r => r.PaymentUid).Distinct().ToList(), cancellationToken);
 
         var carsByUid = cars.ToDictionary(c => c.CarUid);
@@ -57,11 +64,11 @@ public class CarRentalService : ICarRentalService
         string username,
         CancellationToken cancellationToken = default)
     {
-        var rental = await _rentalsService.GetRentalAsync(rentalUid, username, cancellationToken)
+        var rental = await _rentalsReadService.GetRentalAsync(rentalUid, username, cancellationToken)
             ?? throw new AppNotFoundException($"Rental with uid {rentalUid} was not found");
-        var car = await _carsService.GetCarAsync(rental.CarUid, cancellationToken)
+        var car = await _carsReadService.GetCarAsync(rental.CarUid, cancellationToken)
             ?? throw new AppInconsistentDataException($"Car {rental.CarUid} referenced by rental {rentalUid} was not found");
-        var payment = await _paymentService.GetPaymentAsync(rental.PaymentUid, cancellationToken)
+        var payment = await _paymentsReadService.GetPaymentAsync(rental.PaymentUid, cancellationToken)
             ?? throw new AppInconsistentDataException($"Payment {rental.PaymentUid} referenced by rental {rentalUid} was not found");
 
         return rental.ToAggregate(car, payment);
@@ -78,15 +85,15 @@ public class CarRentalService : ICarRentalService
         if (days <= 0)
             throw new AppValidationException("dateTo", "DateTo should be after dateFrom");
 
-        var car = await _carsService.GetCarAsync(carUid, cancellationToken)
+        var car = await _carsReadService.GetCarAsync(carUid, cancellationToken)
             ?? throw new AppNotFoundException($"Car with uid {carUid} was not found");
 
-        await _carsService.ReserveCarAsync(carUid, cancellationToken);
+        await _carsWriteService.ReserveCarAsync(carUid, cancellationToken);
 
         PaymentDto payment;
         try
         {
-            payment = await _paymentService.CreatePaymentAsync(days * car.Price, cancellationToken);
+            payment = await _paymentsWriteService.CreatePaymentAsync(days * car.Price, cancellationToken);
         }
         catch
         {
@@ -97,7 +104,7 @@ public class CarRentalService : ICarRentalService
         RentalDto rental;
         try
         {
-            rental = await _rentalsService.CreateRentalAsync(
+            rental = await _rentalsWriteService.CreateRentalAsync(
                 new CreateRentalCommand
                 {
                     Username = username,
@@ -123,10 +130,10 @@ public class CarRentalService : ICarRentalService
         string username,
         CancellationToken cancellationToken = default)
     {
-        var rental = await _rentalsService.CancelRentalAsync(rentalUid, username, cancellationToken);
+        var rental = await _rentalsWriteService.CancelRentalAsync(rentalUid, username, cancellationToken);
 
-        await _carsService.ReleaseCarAsync(rental.CarUid, cancellationToken);
-        await _paymentService.CancelPaymentAsync(rental.PaymentUid, cancellationToken);
+        await _carsWriteService.ReleaseCarAsync(rental.CarUid, cancellationToken);
+        await _paymentsWriteService.CancelPaymentAsync(rental.PaymentUid, cancellationToken);
     }
 
     public async Task FinishRentalAsync(
@@ -134,9 +141,9 @@ public class CarRentalService : ICarRentalService
         string username,
         CancellationToken cancellationToken = default)
     {
-        var rental = await _rentalsService.FinishRentalAsync(rentalUid, username, cancellationToken);
+        var rental = await _rentalsWriteService.FinishRentalAsync(rentalUid, username, cancellationToken);
 
-        await _carsService.ReleaseCarAsync(rental.CarUid, cancellationToken);
+        await _carsWriteService.ReleaseCarAsync(rental.CarUid, cancellationToken);
     }
 
     private static CarDto GetCarOrThrow(IReadOnlyDictionary<Guid, CarDto> carsByUid, RentalDto rental)
@@ -161,7 +168,7 @@ public class CarRentalService : ICarRentalService
     {
         try
         {
-            await _carsService.ReleaseCarAsync(carUid, cancellationToken);
+            await _carsWriteService.ReleaseCarAsync(carUid, cancellationToken);
         }
         catch (AppException)
         {
@@ -173,7 +180,7 @@ public class CarRentalService : ICarRentalService
     {
         try
         {
-            await _paymentService.CancelPaymentAsync(paymentUid, cancellationToken);
+            await _paymentsWriteService.CancelPaymentAsync(paymentUid, cancellationToken);
         }
         catch (AppException)
         {

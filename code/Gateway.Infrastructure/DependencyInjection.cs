@@ -21,37 +21,66 @@ public static class DependencyInjection
     {
         var section = configuration.GetSection(ServicesSection);
 
-        services.AddHttpClient<ICarsService, CarsHttpClient>(client =>
+        var carsOptions = GetServiceClientOptions(section, "Cars");
+        var rentalsOptions = GetServiceClientOptions(section, "Rentals");
+        var paymentsOptions = GetServiceClientOptions(section, "Payments");
+
+        services.AddHttpClient<ICarsReadService, CarsReadHttpClient>(client =>
         {
-            var options = GetServiceClientOptions(section, "Cars");
-            client.BaseAddress = GetBaseAddress(section, "Cars");
+            client.BaseAddress = ToBaseAddress(carsOptions, "Cars");
         })
-        .AddResilienceHandler("CarsResilience", (builder, context) =>
+        .AddResilienceHandler("CarsRead", (builder, context) =>
         {
-            var options = GetServiceClientOptions(section, "Cars");
-            ConfigureResilience(builder, options);
+            ConfigureResilience(builder, carsOptions);
         });
 
-        services.AddHttpClient<IPaymentsService, PaymentsHttpClient>(client =>
+        services.AddHttpClient<ICarsWriteService, CarsWriteHttpClient>(client =>
         {
-            var options = GetServiceClientOptions(section, "Payments");
-            client.BaseAddress = GetBaseAddress(section, "Payments");
+            client.BaseAddress = ToBaseAddress(carsOptions, "Cars");
         })
-        .AddResilienceHandler("PaymentsResilience", (builder, context) =>
+        .AddResilienceHandler("CarsWrite", (builder, _) =>
         {
-            var options = GetServiceClientOptions(section, "Payments");
-            ConfigureResilience(builder, options);
+            builder.AddTimeout(TimeSpan.FromSeconds(carsOptions.TimeoutSeconds));
         });
 
-        services.AddHttpClient<IRentalsService, RentalsHttpClient>(client =>
+
+
+        services.AddHttpClient<IPaymentsReadService, PaymentsReadHttpClient>(client =>
         {
-            var options = GetServiceClientOptions(section, "Rentals");
-            client.BaseAddress = GetBaseAddress(section, "Rentals");
+            client.BaseAddress = ToBaseAddress(paymentsOptions, "Payments");
         })
-        .AddResilienceHandler("RentalsResilience", (builder, context) =>
+        .AddResilienceHandler("PaymentsRead", (builder, context) =>
         {
-            var options = GetServiceClientOptions(section, "Rentals");
-            ConfigureResilience(builder, options);
+            ConfigureResilience(builder, paymentsOptions);
+        });
+
+        services.AddHttpClient<IPaymentsWriteService, PaymentsWriteHttpClient>(client =>
+        {
+            client.BaseAddress = ToBaseAddress(paymentsOptions, "Payments");
+        })
+        .AddResilienceHandler("PaymentsWrite", (builder, _) =>
+        {
+            builder.AddTimeout(TimeSpan.FromSeconds(paymentsOptions.TimeoutSeconds));
+        });
+        
+
+
+        services.AddHttpClient<IRentalsReadService, RentalsReadHttpClient>(client =>
+        {
+            client.BaseAddress = ToBaseAddress(rentalsOptions, "Rentals");
+        })
+        .AddResilienceHandler("RentalsRead", (builder, context) =>
+        {
+            ConfigureResilience(builder, rentalsOptions);
+        });
+
+        services.AddHttpClient<IRentalsWriteService, RentalsWriteHttpClient>(client =>
+        {
+            client.BaseAddress = ToBaseAddress(rentalsOptions, "Rentals");
+        })
+        .AddResilienceHandler("RentalsWrite", (builder, _) =>
+        {
+            builder.AddTimeout(TimeSpan.FromSeconds(rentalsOptions.TimeoutSeconds));
         });
 
         return services;
@@ -87,14 +116,14 @@ public static class DependencyInjection
         var options = section.GetSection(serviceName).Get<ServiceClientOptions>()
             ?? throw new InvalidOperationException($"Service client options for {serviceName} " +
             $"service are not configured ({ServicesSection}:{serviceName})");
+        if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            throw new InvalidOperationException(
+                $"Base url for {serviceName} is not configured");
         return options;
     }
 
-    private static Uri GetBaseAddress(IConfigurationSection section, string serviceName)
+    private static Uri ToBaseAddress(ServiceClientOptions options, string serviceName)
     {
-        var url = section[serviceName]
-            ?? throw new InvalidOperationException($"Base url for {serviceName} service is not configured ({ServicesSection}:{serviceName})");
-
-        return new Uri(url.EndsWith('/') ? url : url + "/");
+        return new Uri(options.BaseUrl.EndsWith('/') ? options.BaseUrl : options.BaseUrl + "/");
     }
 }
