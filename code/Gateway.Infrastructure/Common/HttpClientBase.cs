@@ -1,8 +1,10 @@
+using Gateway.Application.Exceptions;
+using Polly.CircuitBreaker;
+using Polly.Timeout;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Gateway.Application.Exceptions;
 
 namespace Gateway.Infrastructure.Common;
 
@@ -56,6 +58,14 @@ public abstract class HttpClientBase
         try
         {
             return await HttpClient.SendAsync(request, cancellationToken);
+        }
+        catch (BrokenCircuitException exception)
+        {
+            throw Unavailable($"{ServiceName} service is unavailable (circuit is open)", exception);
+        }
+        catch (TimeoutRejectedException exception)
+        {
+            throw Unavailable($"{ServiceName} service request timed out", exception);
         }
         catch (HttpRequestException exception)
         {
