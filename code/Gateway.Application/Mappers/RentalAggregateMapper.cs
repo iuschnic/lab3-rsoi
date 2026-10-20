@@ -4,7 +4,7 @@ namespace Gateway.Application.Mappers;
 
 public static class RentalAggregateMapper
 {
-    public static RentalAggregate ToAggregate(this RentalDto rental, CarDto car, PaymentDto payment) => new()
+    public static RentalAggregate ToAggregate(this RentalDto rental, CarDto? car, PaymentDto? payment) => new()
     {
         RentalUid = rental.RentalUid,
         Username = rental.Username,

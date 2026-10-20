@@ -9,6 +9,6 @@ public class RentalAggregate
     public RentalStatusDto Status { get; init; }
     public DateOnly DateFrom { get; init; }
     public DateOnly DateTo { get; init; }
-    public CarDto Car { get; init; } = null!;
-    public PaymentDto Payment { get; init; } = null!;
+    public CarDto? Car { get; init; } = null!;
+    public PaymentDto? Payment { get; init; } = null!;
 }
