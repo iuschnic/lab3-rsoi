@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using Gateway.Api.Serialization;
+
 namespace Gateway.Api.Responses;
 
 public class RentalResponse
@@ -7,5 +10,6 @@ public class RentalResponse
     public DateOnly DateFrom { get; init; }
     public DateOnly DateTo { get; init; }
     public CarInfo? Car { get; init; } = null!;
-    public PaymentInfo? Payment { get; init; } = null!;
+    [JsonConverter(typeof(NullToEmptyObjectConverter<PaymentInfo>))]
+    public PaymentInfo? Payment { get; init; }
 }
