@@ -40,15 +40,29 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
         bool showAll,
         CancellationToken cancellationToken = default)
     {
-        return await _carsReadService.GetCarsAsync(page, size, showAll, cancellationToken);
+        try
+        {
+            return await _carsReadService.GetCarsAsync(page, size, showAll, cancellationToken);
+        }
+        catch (ServiceUnavailableException exception)
+        {
+            throw new CriticalServiceUnavailableException(exception);
+        }
     }
 
     public async Task<IReadOnlyList<RentalAggregate>> GetUserRentalsAsync(
         string username,
         CancellationToken cancellationToken = default)
     {
-        var rentals = await _rentalsReadService.GetRentalsAsync(
-            username, cancellationToken);
+        IReadOnlyList<RentalDto> rentals;
+        try
+        {
+            rentals = await _rentalsReadService.GetRentalsAsync(username, cancellationToken);
+        }
+        catch (ServiceUnavailableException exception)
+        {
+            throw new CriticalServiceUnavailableException(exception);
+        }
 
         if (rentals.Count == 0)
             return [];
@@ -92,8 +106,16 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
         string username,
         CancellationToken cancellationToken = default)
     {
-        var rental = await _rentalsReadService.GetRentalAsync(rentalUid, username, cancellationToken)
-            ?? throw new AppNotFoundException($"Rental with uid {rentalUid} was not found");
+        RentalDto rental;
+        try
+        {
+            rental = await _rentalsReadService.GetRentalAsync(rentalUid, username, cancellationToken)
+                ?? throw new AppNotFoundException($"Rental with uid {rentalUid} was not found");
+        }
+        catch (ServiceUnavailableException exception)
+        {
+            throw new CriticalServiceUnavailableException(exception);
+        }
 
         CarDto? car;
         try

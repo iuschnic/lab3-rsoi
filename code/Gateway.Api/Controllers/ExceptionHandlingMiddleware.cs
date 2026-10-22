@@ -85,22 +85,27 @@ public class ExceptionHandlingMiddleware
                 }, JsonOptions);
                 break;
 
+            case CriticalServiceUnavailableException criticalException:
+                _logger.LogError(exception, "Critical {Service} service call failed on {Method} {Path}",
+                    criticalException.ServiceName,
+                    context.Request.Method,
+                    context.Request.Path);
+                response.StatusCode = StatusCodes.Status500InternalServerError;
+                await response.WriteAsJsonAsync(new ErrorResponse
+                {
+                    Message = $"{GetPublicServiceName(criticalException.ServiceName)} Service unavailable"
+                }, JsonOptions);
+                break;
+
             case ServiceUnavailableException serviceUnavailableException:
                 _logger.LogError(exception, "{Service} service call failed on {Method} {Path}",
                     serviceUnavailableException.ServiceName,
                     context.Request.Method,
                     context.Request.Path);
                 response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-                var publicServiceName = serviceUnavailableException.ServiceName switch
-                {
-                    "Payments" => "Payment",
-                    "Rentals" => "Rental",
-                    "Cars" => "Car",
-                    _ => serviceUnavailableException.ServiceName
-                };
                 await response.WriteAsJsonAsync(new ErrorResponse
                 {
-                    Message = $"{publicServiceName} Service unavailable"
+                    Message = $"{GetPublicServiceName(serviceUnavailableException.ServiceName)} Service unavailable"
                 }, JsonOptions);
                 break;
 
@@ -115,4 +120,12 @@ public class ExceptionHandlingMiddleware
                 break;
         }
     }
+
+    private static string GetPublicServiceName(string serviceName) => serviceName switch
+    {
+        "Payments" => "Payment",
+        "Rentals" => "Rental",
+        "Cars" => "Car",
+        _ => serviceName
+    };
 }

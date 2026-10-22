@@ -1,8 +1,5 @@
 namespace Gateway.Application.Exceptions;
 
-/// <summary>
-/// Сервис не ответил или ответил ошибкой, которую gateway обработать не может.
-/// </summary>
 public class ServiceUnavailableException : AppException
 {
     public string ServiceName { get; }

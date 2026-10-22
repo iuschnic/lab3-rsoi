@@ -11,17 +11,20 @@ namespace UnitTestsGateway;
 public class ExceptionHandlingMiddlewareTests
 {
     [Theory]
-    [InlineData("Payments", "Payment", "Payments service is unreachable")]
-    [InlineData("Payments", "Payment", "Payments service responded with 500 InternalServerError: database failed")]
-    [InlineData("Rentals", "Rental", "Rentals service request timed out")]
-    [InlineData("Cars", "Car", "Cars service is unavailable (circuit is open)")]
+    [InlineData("Payments", "Payment", "Payments service is unreachable", false)]
+    [InlineData("Payments", "Payment", "Payments service responded with 500 InternalServerError: database failed", false)]
+    [InlineData("Rentals", "Rental", "Rentals service request timed out", false)]
+    [InlineData("Cars", "Car", "Cars service is unavailable (circuit is open)", false)]
+    [InlineData("Cars", "Car", "Cars service request timed out", true)]
+    [InlineData("Rentals", "Rental", "Rentals service is unreachable", true)]
     public async Task UnavailableResponseUsesPublicServiceNameInsteadOfTechnicalDetails(
-        string serviceName, string publicName, string details)
+        string serviceName, string publicName, string details, bool critical)
     {
         var exception = new ServiceUnavailableException(serviceName, details,
             new HttpRequestException("Connection refused"));
+        Exception failure = critical ? new CriticalServiceUnavailableException(exception) : exception;
         var middleware = new ExceptionHandlingMiddleware(
-            _ => throw exception,
+            _ => throw failure,
             NullLogger<ExceptionHandlingMiddleware>.Instance);
         using var services = new ServiceCollection().BuildServiceProvider();
         var context = new DefaultHttpContext { RequestServices = services };
@@ -30,7 +33,8 @@ public class ExceptionHandlingMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
+        Assert.Equal(critical ? StatusCodes.Status500InternalServerError : StatusCodes.Status503ServiceUnavailable,
+            context.Response.StatusCode);
         Assert.StartsWith("application/json", context.Response.ContentType);
         body.Position = 0;
         using var json = await JsonDocument.ParseAsync(body);
