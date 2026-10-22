@@ -34,8 +34,8 @@ public static class RentalContractMapper
         Status = aggregate.Status.ToResponse(),
         DateFrom = aggregate.DateFrom,
         DateTo = aggregate.DateTo,
-        Car = aggregate.Car.ToInfo(),
-        Payment = aggregate.Payment.ToInfo(),
+        Car = aggregate.Car?.ToInfo(),
+        Payment = aggregate.Payment?.ToInfo(),
     };
 
     public static IReadOnlyList<RentalResponse> ToResponse(this IEnumerable<RentalAggregate> aggregates)
@@ -45,7 +45,7 @@ public static class RentalContractMapper
     {
         RentalUid = aggregate.RentalUid,
         Status = aggregate.Status.ToResponse(),
-        CarUid = aggregate.Car.CarUid,
+        CarUid = aggregate.CarUid,
         DateFrom = aggregate.DateFrom,
         DateTo = aggregate.DateTo,
         Payment = aggregate.Payment.ToInfo(),

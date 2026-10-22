@@ -11,7 +11,9 @@ public static class RentalAggregateMapper
         Status = rental.Status,
         DateFrom = rental.DateFrom,
         DateTo = rental.DateTo,
+        CarUid = rental.CarUid,
         Car = car,
+        PaymentUid = rental.PaymentUid,
         Payment = payment,
     };
 }
