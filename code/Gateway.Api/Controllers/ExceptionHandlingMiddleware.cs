@@ -90,7 +90,7 @@ public class ExceptionHandlingMiddleware
                     serviceUnavailableException.ServiceName,
                     context.Request.Method,
                     context.Request.Path);
-                response.StatusCode = StatusCodes.Status500InternalServerError;
+                response.StatusCode = StatusCodes.Status503ServiceUnavailable;
                 await response.WriteAsJsonAsync(new ErrorResponse
                 {
                     Message = exception.Message
