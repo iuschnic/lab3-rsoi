@@ -5,6 +5,10 @@ namespace Gateway.Application.InPorts;
 public interface IDeferredOperationService
 {
     Task ProcessAsync(
-        DeferredOperation operation,
+        CancelRentalDeferredOperation operation,
+        CancellationToken cancellationToken = default);
+
+    Task ProcessAsync(
+        FinishRentalDeferredOperation operation,
         CancellationToken cancellationToken = default);
 }

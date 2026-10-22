@@ -8,7 +8,8 @@ public record FinishOpGetRental(
 
 public record FinishOpFinishRental(
     Guid RentalUid,
-    string Username) : FinishRentalDeferredOperation;
+    string Username,
+    Guid CarUid) : FinishRentalDeferredOperation;
 
 public record FinishOpReleaseCar(
     Guid CarUid) : FinishRentalDeferredOperation;

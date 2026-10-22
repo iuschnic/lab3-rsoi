@@ -5,10 +5,11 @@ using Gateway.Application.InPorts;
 using Gateway.Application.Mappers;
 using Gateway.Application.Operations;
 using Gateway.Application.OutPorts;
+using System.Collections;
 
 namespace Gateway.Application.Services;
 
-public class CarRentalService : ICarRentalService
+public class CarRentalService : ICarRentalService, IDeferredOperationService
 {
     private readonly ICarsReadService _carsReadService;
     private readonly ICarsWriteService _carsWriteService;
@@ -170,15 +171,11 @@ public class CarRentalService : ICarRentalService
         string username,
         CancellationToken cancellationToken = default)
     {
-        var rental = await _rentalsReadService.GetRentalAsync(rentalUid, username, cancellationToken)
-            ?? throw new AppNotFoundException($"Rental with uid {rentalUid} was not found");
+        var remaining = await CancelRentalUntilBlockedAsync(new CancelOpGetRental(rentalUid, username), 
+            cancellationToken);
 
-        await _carsWriteService.ReleaseCarAsync(rental.CarUid, cancellationToken);
-
-        // TODO CancelRental не должен возвращать модель
-        await _rentalsWriteService.CancelRentalAsync(rentalUid, username, cancellationToken);
-
-        await _paymentsWriteService.CancelPaymentAsync(rental.PaymentUid, cancellationToken);
+        if (remaining is not null)
+            await _queue.EnqueueAsync(remaining, cancellationToken);
     }
 
     public async Task FinishRentalAsync(
@@ -186,13 +183,185 @@ public class CarRentalService : ICarRentalService
         string username,
         CancellationToken cancellationToken = default)
     {
-        var rental = await _rentalsReadService.GetRentalAsync(rentalUid, username, cancellationToken)
-            ?? throw new AppNotFoundException($"Rental with uid {rentalUid} was not found");
+        var remaining = await FinishRentalUntilBlockedAsync(new FinishOpGetRental(rentalUid, username),
+            cancellationToken);
 
-        // TODO FinishRental не должен возвращать модель
-        await _rentalsWriteService.FinishRentalAsync(rentalUid, username, cancellationToken);
+        if (remaining is not null)
+            await _queue.EnqueueAsync(remaining, cancellationToken);
+    }
 
-        await _carsWriteService.ReleaseCarAsync(rental.CarUid, cancellationToken);
+    public async Task ProcessAsync(
+        CancelRentalDeferredOperation operation,
+        CancellationToken cancellationToken = default)
+    {
+        var remaining = await CancelRentalUntilBlockedAsync(operation, cancellationToken);
+
+        if (remaining is not null)
+            await _queue.EnqueueAsync(remaining, cancellationToken);
+    }
+
+    public async Task ProcessAsync(
+        FinishRentalDeferredOperation operation,
+        CancellationToken cancellationToken = default)
+    {
+        var remaining = await FinishRentalUntilBlockedAsync(operation, cancellationToken);
+
+        if (remaining is not null)
+            await _queue.EnqueueAsync(remaining, cancellationToken);
+    }
+
+    private async Task<CancelRentalDeferredOperation?> CancelRentalUntilBlockedAsync(
+        CancelRentalDeferredOperation operation,
+        CancellationToken cancellationToken)
+    {
+        CancelRentalDeferredOperation? current = operation;
+
+        while (current is not null)
+        {
+            try
+            {
+                current = await CancelRentalExecuteStepAsync(current, cancellationToken);
+            }
+            catch (ServiceUnavailableException)
+            {
+                return current;
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<FinishRentalDeferredOperation?> FinishRentalUntilBlockedAsync(
+        FinishRentalDeferredOperation operation,
+        CancellationToken cancellationToken)
+    {
+        FinishRentalDeferredOperation? current = operation;
+
+        while (current is not null)
+        {
+            try
+            {
+                current = await FinishRentalExecuteStepAsync(current, cancellationToken);
+            }
+            catch (ServiceUnavailableException)
+            {
+                return current;
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<CancelRentalDeferredOperation?> CancelRentalExecuteStepAsync(
+        CancelRentalDeferredOperation operation,
+        CancellationToken cancellationToken)
+    {
+        switch (operation)
+        {
+            case CancelOpGetRental get:
+            {
+                var rental = await _rentalsReadService.GetRentalAsync(
+                    get.RentalUid,
+                    get.Username,
+                    cancellationToken)
+                    ?? throw new AppNotFoundException(
+                        $"Rental {get.RentalUid} was not found");
+
+                if (rental.Status == RentalStatusDto.Finished)
+                        throw new AppConflictException($"Finished rental {get.RentalUid} cannot be canceled");
+
+                return new CancelOpReleaseCar(
+                    rental.RentalUid,
+                    get.Username,
+                    rental.CarUid,
+                    rental.PaymentUid);
+            }
+
+            case CancelOpReleaseCar release:
+            {
+                await _carsWriteService.ReleaseCarAsync(
+                    release.CarUid, cancellationToken);
+
+                return new CancelOpCancelRental(
+                    release.RentalUid,
+                    release.Username,
+                    release.PaymentUid);
+            }
+
+            case CancelOpCancelRental cancel:
+            {
+                // TODO CancelRental не должен возвращать модель
+                await _rentalsWriteService.CancelRentalAsync(
+                    cancel.RentalUid,
+                    cancel.Username,
+                    cancellationToken);
+
+                return new CancelOpCancelPayment(cancel.PaymentUid);
+            }
+
+            case CancelOpCancelPayment payment:
+            {
+                await _paymentsWriteService.CancelPaymentAsync(
+                    payment.PaymentUid, cancellationToken);
+
+                return null;
+            }
+
+            default:
+                throw new NotSupportedException(
+                    $"Unsupported operation: {operation.GetType().Name}");
+        }
+    }
+
+    private async Task<FinishRentalDeferredOperation?> FinishRentalExecuteStepAsync(
+        FinishRentalDeferredOperation operation,
+        CancellationToken cancellationToken)
+    {
+        switch (operation)
+        {
+            case FinishOpGetRental get:
+            {
+                var rental = await _rentalsReadService.GetRentalAsync(
+                    get.RentalUid,
+                    get.Username,
+                    cancellationToken)
+                    ?? throw new AppNotFoundException(
+                        $"Rental {get.RentalUid} was not found");
+
+                if (rental.Status == RentalStatusDto.Canceled)
+                    throw new AppConflictException($"Canceled rental {get.RentalUid} cannot be finished");
+
+                return new FinishOpFinishRental(
+                    rental.RentalUid,
+                    get.Username,
+                    rental.CarUid);
+            }
+
+            case FinishOpFinishRental finish:
+            {
+                // TODO FinishRental не должен возвращать модель
+                await _rentalsWriteService.FinishRentalAsync(
+                    finish.RentalUid,
+                    finish.Username,
+                    cancellationToken);
+
+                return new FinishOpReleaseCar(
+                    finish.CarUid);
+            }
+
+            case FinishOpReleaseCar release:
+            {
+                await _carsWriteService.ReleaseCarAsync(
+                    release.CarUid,
+                    cancellationToken);
+
+                return null;
+            }
+
+            default:
+                throw new NotSupportedException(
+                    $"Unsupported operation: {operation.GetType().Name}");
+        }
     }
 
     private static CarDto GetCarOrThrow(IReadOnlyDictionary<Guid, CarDto> carsByUid, RentalDto rental)
