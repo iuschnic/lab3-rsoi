@@ -1,14 +1,14 @@
 using Gateway.Application.Dtos;
+using Gateway.Application.Enums;
 using Gateway.Application.Exceptions;
 using Gateway.Application.InPorts;
 using Gateway.Application.Mappers;
 using Gateway.Application.Operations;
 using Gateway.Application.OutPorts;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Gateway.Application.Services;
 
-public class CarRentalService : ICarRentalService, IDeferredOperationService
+public class CarRentalService : ICarRentalService
 {
     private readonly ICarsReadService _carsReadService;
     private readonly ICarsWriteService _carsWriteService;
@@ -27,26 +27,6 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
         _rentalsWriteService = rentalsWriteService;
         _paymentsReadService = paymentsReadService;
         _paymentsWriteService = paymentsWriteService;
-    }
-
-    public Task ProcessAsync(
-    DeferredOperation operation,
-    CancellationToken cancellationToken = default)
-    {
-        return operation switch
-        {
-            CreateRentalOperation create =>
-                ExecuteCreateRentalAsync(create, cancellationToken),
-
-            CancelRentalOperation cancel =>
-                ExecuteCancelRentalAsync(cancel, cancellationToken),
-
-            FinishRentalOperation finish =>
-                ExecuteFinishRentalAsync(finish, cancellationToken),
-
-            _ => throw new NotSupportedException(
-                $"Unsupported operation type: {operation.GetType().Name}")
-        };
     }
 
     public async Task<PagedResultDto<CarDto>> GetCarsAsync(
@@ -141,47 +121,6 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
         DateOnly dateTo,
         CancellationToken cancellationToken = default)
     {
-        return await CreateRentalCoreAsync(carUid, username, dateFrom, dateTo, cancellationToken);
-    }
-
-    public async Task CancelRentalAsync(
-        Guid rentalUid,
-        string username,
-        CancellationToken cancellationToken = default)
-    {
-        await CancelRentalCoreAsync(rentalUid, username, cancellationToken);
-    }
-
-    public async Task FinishRentalAsync(
-        Guid rentalUid,
-        string username,
-        CancellationToken cancellationToken = default)
-    {
-        await FinishRentalCoreAsync(rentalUid, username, cancellationToken);
-    }
-
-    private async Task ExecuteCreateRentalAsync(CreateRentalOperation create,  CancellationToken cancellationToken)
-    {
-        await CreateRentalCoreAsync(create.CarUid, create.Username, create.DateFrom, create.DateTo, cancellationToken);
-    }
-
-    private async Task ExecuteCancelRentalAsync(CancelRentalOperation cancel, CancellationToken cancellationToken)
-    {
-        await CancelRentalCoreAsync(cancel.RentalUid, cancel.Username, cancellationToken);
-    }
-
-    private async Task ExecuteFinishRentalAsync(FinishRentalOperation finish, CancellationToken cancellationToken)
-    {
-        await FinishRentalCoreAsync(finish.RentalUid, finish.Username, cancellationToken);
-    }
-
-    private async Task<RentalAggregate> CreateRentalCoreAsync(
-        Guid carUid,
-        string username,
-        DateOnly dateFrom,
-        DateOnly dateTo,
-        CancellationToken cancellationToken = default)
-    {
         var days = dateTo.DayNumber - dateFrom.DayNumber;
         if (days <= 0)
             throw new AppValidationException("dateTo", "DateTo should be after dateFrom");
@@ -226,25 +165,34 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
         return rental.ToAggregate(car, payment);
     }
 
-    private async Task FinishRentalCoreAsync(
+    public async Task CancelRentalAsync(
         Guid rentalUid,
         string username,
         CancellationToken cancellationToken = default)
     {
-        var rental = await _rentalsWriteService.FinishRentalAsync(rentalUid, username, cancellationToken);
+        var rental = await _rentalsReadService.GetRentalAsync(rentalUid, username, cancellationToken)
+            ?? throw new AppNotFoundException($"Rental with uid {rentalUid} was not found");
 
         await _carsWriteService.ReleaseCarAsync(rental.CarUid, cancellationToken);
+
+        // TODO CancelRental не должен возвращать модель
+        await _rentalsWriteService.CancelRentalAsync(rentalUid, username, cancellationToken);
+
+        await _paymentsWriteService.CancelPaymentAsync(rental.PaymentUid, cancellationToken);
     }
 
-    private async Task CancelRentalCoreAsync(
+    public async Task FinishRentalAsync(
         Guid rentalUid,
         string username,
         CancellationToken cancellationToken = default)
     {
-        var rental = await _rentalsWriteService.CancelRentalAsync(rentalUid, username, cancellationToken);
+        var rental = await _rentalsReadService.GetRentalAsync(rentalUid, username, cancellationToken)
+            ?? throw new AppNotFoundException($"Rental with uid {rentalUid} was not found");
+
+        // TODO FinishRental не должен возвращать модель
+        await _rentalsWriteService.FinishRentalAsync(rentalUid, username, cancellationToken);
 
         await _carsWriteService.ReleaseCarAsync(rental.CarUid, cancellationToken);
-        await _paymentsWriteService.CancelPaymentAsync(rental.PaymentUid, cancellationToken);
     }
 
     private static CarDto GetCarOrThrow(IReadOnlyDictionary<Guid, CarDto> carsByUid, RentalDto rental)
