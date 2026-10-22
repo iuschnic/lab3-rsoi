@@ -1,6 +1,6 @@
 ﻿namespace Gateway.Application.Operations;
 
-public abstract record FinishRentalDeferredOperation;
+public abstract record FinishRentalDeferredOperation : DeferredOperation;
 
 public record FinishOpGetRental(
     Guid RentalUid,

@@ -17,4 +17,5 @@
   <Project Path="UnitTestsCars/UnitTestsCars.csproj" />
   <Project Path="UnitTestsPayments/UnitTestsPayments.csproj" />
   <Project Path="UnitTestsRentals/UnitTestsRentals.csproj" />
+  <Project Path="UnitTestsGateway/UnitTestsGateway.csproj" />
 </Solution>

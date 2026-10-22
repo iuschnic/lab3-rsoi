@@ -5,7 +5,6 @@ using Gateway.Application.InPorts;
 using Gateway.Application.Mappers;
 using Gateway.Application.Operations;
 using Gateway.Application.OutPorts;
-using System.Collections;
 
 namespace Gateway.Application.Services;
 
@@ -17,10 +16,14 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
     private readonly IRentalsWriteService _rentalsWriteService;
     private readonly IPaymentsReadService _paymentsReadService;
     private readonly IPaymentsWriteService _paymentsWriteService;
+    private readonly IDeferredOperationScheduler _scheduler;
+
+    public static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(10);
 
     public CarRentalService(ICarsReadService carsReadService, ICarsWriteService carsWriteService, 
         IRentalsReadService rentalsReadService, IRentalsWriteService rentalsWriteService,
-        IPaymentsReadService paymentsReadService, IPaymentsWriteService paymentsWriteService)
+        IPaymentsReadService paymentsReadService, IPaymentsWriteService paymentsWriteService,
+        IDeferredOperationScheduler scheduler)
     {
         _carsReadService = carsReadService;
         _carsWriteService = carsWriteService;
@@ -28,6 +31,7 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
         _rentalsWriteService = rentalsWriteService;
         _paymentsReadService = paymentsReadService;
         _paymentsWriteService = paymentsWriteService;
+        _scheduler = scheduler;
     }
 
     public async Task<PagedResultDto<CarDto>> GetCarsAsync(
@@ -175,7 +179,7 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
             cancellationToken);
 
         if (remaining is not null)
-            await _queue.EnqueueAsync(remaining, cancellationToken);
+            await _scheduler.ScheduleAsync(remaining, DateTimeOffset.UtcNow + RetryDelay, cancellationToken);
     }
 
     public async Task FinishRentalAsync(
@@ -187,27 +191,21 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
             cancellationToken);
 
         if (remaining is not null)
-            await _queue.EnqueueAsync(remaining, cancellationToken);
+            await _scheduler.ScheduleAsync(remaining, DateTimeOffset.UtcNow + RetryDelay, cancellationToken);
     }
 
-    public async Task ProcessAsync(
-        CancelRentalDeferredOperation operation,
+    public async Task<DeferredOperation?> ProcessAsync(
+        DeferredOperation operation,
         CancellationToken cancellationToken = default)
     {
-        var remaining = await CancelRentalUntilBlockedAsync(operation, cancellationToken);
-
-        if (remaining is not null)
-            await _queue.EnqueueAsync(remaining, cancellationToken);
-    }
-
-    public async Task ProcessAsync(
-        FinishRentalDeferredOperation operation,
-        CancellationToken cancellationToken = default)
-    {
-        var remaining = await FinishRentalUntilBlockedAsync(operation, cancellationToken);
-
-        if (remaining is not null)
-            await _queue.EnqueueAsync(remaining, cancellationToken);
+        return operation switch
+        {
+            CancelRentalDeferredOperation cancel =>
+                await CancelRentalUntilBlockedAsync(cancel, cancellationToken),
+            FinishRentalDeferredOperation finish =>
+                await FinishRentalUntilBlockedAsync(finish, cancellationToken),
+            _ => throw new NotSupportedException($"Unsupported operation: {operation.GetType().Name}")
+        };
     }
 
     private async Task<CancelRentalDeferredOperation?> CancelRentalUntilBlockedAsync(

@@ -1,6 +1,6 @@
 ﻿namespace Gateway.Application.Operations;
 
-public abstract record CancelRentalDeferredOperation;
+public abstract record CancelRentalDeferredOperation : DeferredOperation;
 
 public record CancelOpGetRental(
     Guid RentalUid,
