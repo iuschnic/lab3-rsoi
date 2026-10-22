@@ -91,9 +91,16 @@ public class ExceptionHandlingMiddleware
                     context.Request.Method,
                     context.Request.Path);
                 response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                var publicServiceName = serviceUnavailableException.ServiceName switch
+                {
+                    "Payments" => "Payment",
+                    "Rentals" => "Rental",
+                    "Cars" => "Car",
+                    _ => serviceUnavailableException.ServiceName
+                };
                 await response.WriteAsJsonAsync(new ErrorResponse
                 {
-                    Message = exception.Message
+                    Message = $"{publicServiceName} Service unavailable"
                 }, JsonOptions);
                 break;
 
