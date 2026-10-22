@@ -267,8 +267,8 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
                     ?? throw new AppNotFoundException(
                         $"Rental {get.RentalUid} was not found");
 
-                if (rental.Status == RentalStatusDto.Finished)
-                        throw new AppConflictException($"Finished rental {get.RentalUid} cannot be canceled");
+                if (rental.Status != RentalStatusDto.InProgress)
+                    throw new AppConflictException($"Rental {get.RentalUid} is not in progress and cannot be canceled");
 
                 return new CancelOpReleaseCar(
                     rental.RentalUid,
@@ -328,8 +328,8 @@ public class CarRentalService : ICarRentalService, IDeferredOperationService
                     ?? throw new AppNotFoundException(
                         $"Rental {get.RentalUid} was not found");
 
-                if (rental.Status == RentalStatusDto.Canceled)
-                    throw new AppConflictException($"Canceled rental {get.RentalUid} cannot be finished");
+                if (rental.Status != RentalStatusDto.InProgress)
+                    throw new AppConflictException($"Rental {get.RentalUid} is not in progress and cannot be canceled");
 
                 return new FinishOpFinishRental(
                     rental.RentalUid,
