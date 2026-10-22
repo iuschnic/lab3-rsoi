@@ -1,0 +1,24 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+
+WORKDIR /src
+
+COPY ["./code/Cars.Domain/", "Cars.Domain/"]
+COPY ["./code/Rentals.Domain/", "Rentals.Domain/"]
+COPY ["./code/Payments.Domain/", "Payments.Domain/"]
+COPY ["./code/UnitTestsCars/", "UnitTestsCars/"]
+COPY ["./code/UnitTestsPayments/", "UnitTestsPayments/"]
+COPY ["./code/UnitTestsRentals/", "UnitTestsRentals/"]
+
+RUN dotnet restore "UnitTestsCars/UnitTestsCars.csproj"
+RUN dotnet restore "UnitTestsPayments/UnitTestsPayments.csproj"
+RUN dotnet restore "UnitTestsRentals/UnitTestsRentals.csproj"
+
+RUN dotnet build "UnitTestsCars/UnitTestsCars.csproj" -c Release --no-restore
+RUN dotnet build "UnitTestsPayments/UnitTestsPayments.csproj" -c Release --no-restore
+RUN dotnet build "UnitTestsRentals/UnitTestsRentals.csproj" -c Release --no-restore
+
+ENTRYPOINT ["sh", "-c", \
+  "echo 'Running unit tests...' && \
+   dotnet test UnitTestsCars/UnitTestsCars.csproj -c Release --no-build && \
+   dotnet test UnitTestsPayments/UnitTestsPayments.csproj -c Release --no-build && \
+   dotnet test UnitTestsRentals/UnitTestsRentals.csproj -c Release --no-build"]
